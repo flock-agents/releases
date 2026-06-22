@@ -9,36 +9,18 @@ $InstallDir = "$env:LOCALAPPDATA\Programs\flockagents"
 
 function Main {
     Write-Log "Installing flockagents CLI..."
-    $Version = Get-LatestVersion
     $TempDir = New-TempDirectory
     try {
-        Download-Binary -Version $Version -TempDir $TempDir
+        Download-Binary -TempDir $TempDir
         Verify-Checksum -TempDir $TempDir
         Install-Binary -TempDir $TempDir
         Add-ToPath
         Check-Docker
-        Write-Success -Version $Version
+        Write-Success
     }
     finally {
         Remove-Item -Recurse -Force $TempDir -ErrorAction SilentlyContinue
     }
-}
-
-function Get-LatestVersion {
-    Write-Log "Fetching latest version..."
-    $Url = "https://api.github.com/repos/$Repo/releases/latest"
-    try {
-        $Response = Invoke-RestMethod -Uri $Url -UseBasicParsing
-    }
-    catch {
-        Write-Error-Exit "Could not fetch latest version from GitHub. Check your internet connection."
-    }
-    $Tag = $Response.tag_name
-    if (-not $Tag) {
-        Write-Error-Exit "Could not determine latest version from GitHub releases."
-    }
-    Write-Log "Latest version: $Tag"
-    return $Tag
 }
 
 function New-TempDirectory {
@@ -48,12 +30,13 @@ function New-TempDirectory {
 }
 
 function Download-Binary {
-    param([string]$Version, [string]$TempDir)
+    param([string]$TempDir)
 
     $BinaryFile = "$BinaryName-cli-windows-amd64.exe"
     $script:BinaryFile = $BinaryFile
-    $DownloadUrl = "https://github.com/$Repo/releases/download/$Version/$BinaryFile"
-    $ChecksumsUrl = "https://github.com/$Repo/releases/download/$Version/checksums.txt"
+    $BaseUrl = "https://github.com/$Repo/releases/latest/download"
+    $DownloadUrl = "$BaseUrl/$BinaryFile"
+    $ChecksumsUrl = "$BaseUrl/checksums.txt"
 
     Write-Log "Downloading $BinaryFile..."
     try {
@@ -130,9 +113,15 @@ function Check-Docker {
 }
 
 function Write-Success {
-    param([string]$Version)
-    $VersionNum = $Version -replace '^cli-', ''
     Write-Host ""
+    $Dest = Join-Path $InstallDir "$BinaryName.exe"
+    try {
+        $VersionNum = & $Dest --version 2>$null
+    }
+    catch {
+        $VersionNum = "latest"
+    }
+    if (-not $VersionNum) { $VersionNum = "latest" }
     Write-Log "flockagents installed ($VersionNum). Run 'flockagents install' to set up Flock."
 }
 

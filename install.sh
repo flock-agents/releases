@@ -9,7 +9,6 @@ INSTALL_DIR_USER="${HOME}/.local/bin"
 main() {
     check_deps
     detect_platform
-    fetch_latest_version
     download_binary
     verify_checksum
     install_binary
@@ -48,27 +47,11 @@ detect_platform() {
     log "Detected platform: ${OS}/${ARCH}"
 }
 
-fetch_latest_version() {
-    log "Fetching latest version..."
-    LATEST_URL="https://api.github.com/repos/${REPO}/releases/latest"
-    RESPONSE="$(http_get "${LATEST_URL}")"
-
-    VERSION="$(printf '%s' "${RESPONSE}" | tr ',' '\n' | grep '"tag_name"' | head -1 | sed 's/.*"tag_name"[[:space:]]*:[[:space:]]*"//;s/".*//')"
-    if [ -z "${VERSION}" ]; then
-        error "could not determine latest version from GitHub releases"
-    fi
-
-    # Strip leading "cli-" prefix if present (tags are cli-vX.Y.Z)
-    VERSION_TAG="${VERSION}"
-    VERSION_NUM="$(printf '%s' "${VERSION}" | sed 's/^cli-//')"
-
-    log "Latest version: ${VERSION_NUM}"
-}
-
 download_binary() {
     BINARY_FILENAME="${BINARY_NAME}-cli-${OS}-${ARCH}"
-    DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION_TAG}/${BINARY_FILENAME}"
-    CHECKSUMS_URL="https://github.com/${REPO}/releases/download/${VERSION_TAG}/checksums.txt"
+    BASE_URL="https://github.com/${REPO}/releases/latest/download"
+    DOWNLOAD_URL="${BASE_URL}/${BINARY_FILENAME}"
+    CHECKSUMS_URL="${BASE_URL}/checksums.txt"
 
     TMPDIR="$(mktemp -d)"
     trap 'rm -rf "${TMPDIR}"' EXIT
@@ -142,16 +125,8 @@ check_path() {
 
 print_success() {
     printf '\n'
+    VERSION_NUM="$("${TARGET_DIR}/${BINARY_NAME}" --version 2>/dev/null || echo "latest")"
     log "${BINARY_NAME} installed (${VERSION_NUM}). Run 'flockagents install' to set up Flock."
-}
-
-http_get() {
-    URL="$1"
-    if [ -z "${HAS_WGET:-}" ]; then
-        curl -fsSL --tlsv1.2 "${URL}"
-    else
-        wget -qO- "${URL}"
-    fi
 }
 
 http_download() {
