@@ -53,7 +53,7 @@ fetch_latest_version() {
     LATEST_URL="https://api.github.com/repos/${REPO}/releases/latest"
     RESPONSE="$(http_get "${LATEST_URL}")"
 
-    VERSION="$(printf '%s' "${RESPONSE}" | grep '"tag_name"' | sed -E 's/.*"tag_name":\s*"([^"]+)".*/\1/')"
+    VERSION="$(printf '%s' "${RESPONSE}" | tr ',' '\n' | grep '"tag_name"' | head -1 | sed 's/.*"tag_name"[[:space:]]*:[[:space:]]*"//;s/".*//')"
     if [ -z "${VERSION}" ]; then
         error "could not determine latest version from GitHub releases"
     fi
